@@ -16,218 +16,89 @@
 
 
 
-## 原生http
+## beego 使用
 
 
-### http.ListenAndServe
+### bee 工具
 
-handler 参数(w http.ResponseWriter, r *http.Request)
+一般我们运行go程序使用的 `go run main.go` 这样形式的
 
-go参数传递为值传递，request长用来获取参数等，所以直接传递指针比较好，而 ResponseWriter 是个接口，只要实现接口就行 无所谓传不传指针的问题。
+但是使用 bee 工具的时候需要使用 `bee run appname`, appname 是应用名称，在conf 文件中配置
 
+我在刚开始使用的时候输入 `bee run main.go` 是错误的
 
-```
-package main
 
-import (
-	"net/http"
-	"log"
-	"io"
-)
 
-func main() {
+1. bee new WebBlogTest
+2. bee run WebBlogTest  
 
-	http.Handle("/", sayHello)
 
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
 
-func sayHello(w http.ResponseWriter, r *http.Request)  {
-	io.WriteString(w, "hello world, version 1")
-}
+## 模板
 
+普通使用和go模板类似
 
 
-//访问 http://localhost:8080/
+### with
 
-```
+在输出结构的时候可以使用with 来进行分组，将前面相同的部分进行省略。
 
 
-### http.ServeMux 更底层路由设置
+### beego内置模板函数
 
-[http.ServeMux解析](http://studygolang.com/articles/4890)
+[模板函数](http://beego.me/docs/mvc/view/template.md)
 
-ServeMux 其实是路由表，主要使用map结构，其实例必须实现 **ServeHTTP()** 方法
 
-`mux.m[pattern] = muxEntry{explicit: true, h: handler, pattern: pattern} `
 
-```
 
-package main
 
-import (
-	"net/http"
-	"io"
-	"log"
-)
 
-func main() {
 
-	mux := http.NewServeMux() //路由表结构
-	mux.Handle("/", &MyHandler{}) //这里注册的是处理的指针,默认根路径"/"
-	mux.HandleFunc("/hello", sayHello) //注册/hello 
 
-	err := http.ListenAndServe(":8080", mux) // 将mux 放入
-	if err != nil {
-		log.Fatal(err)
-	}
-}
 
 
-type MyHandler struct {
-	
-}
 
-func (_ * MyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)  {
-	io.WriteString(w, "URL: " + r.URL.String() )
-}
 
-func sayHello(w http.ResponseWriter, r *http.Request)  {
-	io.WriteString(w, "hello world, version 2")
-}
 
 
-//访问 http://localhost:8080/
-//访问 http://localhost:8080/hello
 
 
-```
 
 
 
-### 更进一步实现http.Server
 
-自己实现Server 最重要的是需要自己在 ServeHTTP() 中实现路由转发
 
-```
 
-package main
 
-import (
-	"net/http"
-	"io"
-	"log"
-	"time"
-)
 
-var mux map[string]func(w http.ResponseWriter, r *http.Request)
 
-func main() {
 
-	server := http.Server{
-		Addr : ":8080", //设置地址
-		Handler : &MyHandler{}, //设置处理handler
-		ReadTimeout : 5 * time.Second, //设置超时时间 5S
-	}
 
-	//因为没有提供方法，所以需要自己实现路由，然后在ServeHTTP中进行路由转发
-	mux = make(map[string]func(w http.ResponseWriter, r *http.Request))
-	mux["/hello"] = sayHello
-	mux["/bye"] = sayBye
 
-	err := server.ListenAndServe() // 使用自己实例化的server
-	if err != nil {
-		log.Fatal(err)
-	}
-}
 
-type MyHandler struct {
 
-}
 
-func (_ *MyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	//因为这里没有方法，所以需要进行路由转发
-	if h, ok := mux[r.URL.String()]; ok {
-		h(w, r) //如果存在就转发
-		return
-	}
-	io.WriteString(w, "URL: " + r.URL.String())
-}
 
-func sayHello(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "hello world, version 3")
-}
 
-func sayBye(w http.ResponseWriter, r *http.Request) {
-	io.WriteString(w, "bye bye, version 3")
-}
 
 
-//访问 http://localhost:8080/
-//访问 http://localhost:8080/hello
-//访问 http://localhost:8080/bye
 
-```
 
 
 
-### 静态文件
 
-静态文件就需要使用到http.FileServer
 
-[使用Golang 搭建http web服务器](http://www.cnblogs.com/yjf512/archive/2012/09/03/2668384.html)
 
 
-```
 
-package main
 
-import (
-	"net/http"
-	"io"
-	"log"
-	"os"
-)
 
-func main() {
 
-	mux := http.NewServeMux()
-	mux.Handle("/", &MyHandler{})
-	mux.HandleFunc("/hello", sayHello)
 
-	wd, err := os.Getwd()// 获取当前路径
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	//http.Dir(wd) //获取相对路径
-	//http.FileServer 静态处理
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(wd)))) //设置静态文件路径
 
-	err = http.ListenAndServe(":8080", mux)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
 
 
-type MyHandler struct {
 
-}
 
-func (_ * MyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)  {
-	io.WriteString(w, "URL: " + r.URL.String() )
-}
 
-func sayHello(w http.ResponseWriter, r *http.Request)  {
-	io.WriteString(w, "hello world, version 4")
-}
-
-
-
-// http://localhost:8080/static/
-
-```
